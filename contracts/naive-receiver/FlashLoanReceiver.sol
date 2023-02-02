@@ -11,7 +11,6 @@ import "./NaiveReceiverLenderPool.sol";
  * @author Damn Vulnerable DeFi (https://damnvulnerabledefi.xyz)
  */
 contract FlashLoanReceiver is IERC3156FlashBorrower {
-
     address private pool;
     address private constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
@@ -21,6 +20,7 @@ contract FlashLoanReceiver is IERC3156FlashBorrower {
         pool = _pool;
     }
 
+    // The function doesn't check who is the initiator of the flash loan, so anyone can create flash loans on behalf of this contract
     function onFlashLoan(
         address,
         address token,
@@ -28,16 +28,16 @@ contract FlashLoanReceiver is IERC3156FlashBorrower {
         uint256 fee,
         bytes calldata
     ) external returns (bytes32) {
-        assembly { // gas savings
+        assembly {
+            // gas savings
             if iszero(eq(sload(pool.slot), caller())) {
                 mstore(0x00, 0x48f5c3ed)
                 revert(0x1c, 0x04)
             }
         }
-        
-        if (token != ETH)
-            revert UnsupportedCurrency();
-        
+
+        if (token != ETH) revert UnsupportedCurrency();
+
         uint256 amountToBeRepaid;
         unchecked {
             amountToBeRepaid = amount + fee;
@@ -52,7 +52,7 @@ contract FlashLoanReceiver is IERC3156FlashBorrower {
     }
 
     // Internal function where the funds received would be used
-    function _executeActionDuringFlashLoan() internal { }
+    function _executeActionDuringFlashLoan() internal {}
 
     // Allow deposits of ETH
     receive() external payable {}
