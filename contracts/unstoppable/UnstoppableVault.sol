@@ -3,15 +3,23 @@ pragma solidity ^0.8.0;
 
 import "solmate/src/utils/FixedPointMathLib.sol";
 import "solmate/src/utils/ReentrancyGuard.sol";
-import { SafeTransferLib, ERC4626, ERC20 } from "solmate/src/mixins/ERC4626.sol";
+// ERC4626 is the standard for tokenizing vaults
+import {SafeTransferLib, ERC4626, ERC20} from "solmate/src/mixins/ERC4626.sol";
+// Same as Openzeppelin
 import "solmate/src/auth/Owned.sol";
-import { IERC3156FlashBorrower, IERC3156FlashLender } from "@openzeppelin/contracts/interfaces/IERC3156.sol";
+
+import {IERC3156FlashBorrower, IERC3156FlashLender} from "@openzeppelin/contracts/interfaces/IERC3156.sol";
 
 /**
  * @title UnstoppableVault
  * @author Damn Vulnerable DeFi (https://damnvulnerabledefi.xyz)
  */
-contract UnstoppableVault is IERC3156FlashLender, ReentrancyGuard, Owned, ERC4626 {
+contract UnstoppableVault is
+    IERC3156FlashLender,
+    ReentrancyGuard,
+    Owned,
+    ERC4626
+{
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
@@ -29,10 +37,11 @@ contract UnstoppableVault is IERC3156FlashLender, ReentrancyGuard, Owned, ERC462
 
     event FeeRecipientUpdated(address indexed newFeeRecipient);
 
-    constructor(ERC20 _token, address _owner, address _feeRecipient)
-        ERC4626(_token, "Oh Damn Valuable Token", "oDVT")
-        Owned(_owner)
-    {
+    constructor(
+        ERC20 _token,
+        address _owner,
+        address _feeRecipient
+    ) ERC4626(_token, "Oh Damn Valuable Token", "oDVT") Owned(_owner) {
         feeRecipient = _feeRecipient;
         emit FeeRecipientUpdated(_feeRecipient);
     }
@@ -41,8 +50,7 @@ contract UnstoppableVault is IERC3156FlashLender, ReentrancyGuard, Owned, ERC462
      * @inheritdoc IERC3156FlashLender
      */
     function maxFlashLoan(address _token) public view returns (uint256) {
-        if (address(asset) != _token)
-            return 0;
+        if (address(asset) != _token) return 0;
 
         return totalAssets();
     }
@@ -50,9 +58,11 @@ contract UnstoppableVault is IERC3156FlashLender, ReentrancyGuard, Owned, ERC462
     /**
      * @inheritdoc IERC3156FlashLender
      */
-    function flashFee(address _token, uint256 _amount) public view returns (uint256 fee) {
-        if (address(asset) != _token)
-            revert UnsupportedCurrency();
+    function flashFee(
+        address _token,
+        uint256 _amount
+    ) public view returns (uint256 fee) {
+        if (address(asset) != _token) revert UnsupportedCurrency();
 
         if (block.timestamp < end && _amount < maxFlashLoan(_token)) {
             return 0;
@@ -72,7 +82,8 @@ contract UnstoppableVault is IERC3156FlashLender, ReentrancyGuard, Owned, ERC462
      * @inheritdoc ERC4626
      */
     function totalAssets() public view override returns (uint256) {
-        assembly { // better safe than sorry
+        assembly {
+            // better safe than sorry
             if eq(sload(0), 2) {
                 mstore(0x00, 0xed3ba6a6)
                 revert(0x1c, 0x04)
@@ -92,16 +103,37 @@ contract UnstoppableVault is IERC3156FlashLender, ReentrancyGuard, Owned, ERC462
     ) external returns (bool) {
         if (amount == 0) revert InvalidAmount(0); // fail early
         if (address(asset) != _token) revert UnsupportedCurrency(); // enforce ERC3156 requirement
+        /**
+         *
+         * @notice THE VULNERABILITY IS HERE
+         * The contract assumes that it has 1:1 DVT and oDVT
+         * If someone transfers DVT directly to the Vault, the 1:1 is broken and here it reverts with InvalidBalance()
+         * If we send 10 DVT directly to Vault:
+         *      balanceBefore = 1000010
+         *      convertToShares(totalSupply) = 1000000
+         */
         uint256 balanceBefore = totalAssets();
-        if (convertToShares(totalSupply) != balanceBefore) revert InvalidBalance(); // enforce ERC4626 requirement
+        if (convertToShares(totalSupply) != balanceBefore)
+            revert InvalidBalance(); // enforce ERC4626 requirement
         uint256 fee = flashFee(_token, amount);
         // transfer tokens out + execute callback on receiver
         ERC20(_token).safeTransfer(address(receiver), amount);
         // callback must return magic value, otherwise assume it failed
-        if (receiver.onFlashLoan(msg.sender, address(asset), amount, fee, data) != keccak256("IERC3156FlashBorrower.onFlashLoan"))
-            revert CallbackFailed();
+        if (
+            receiver.onFlashLoan(
+                msg.sender,
+                address(asset),
+                amount,
+                fee,
+                data
+            ) != keccak256("IERC3156FlashBorrower.onFlashLoan")
+        ) revert CallbackFailed();
         // pull amount + fee from receiver, then pay the fee to the recipient
-        ERC20(_token).safeTransferFrom(address(receiver), address(this), amount + fee);
+        ERC20(_token).safeTransferFrom(
+            address(receiver),
+            address(this),
+            amount + fee
+        );
         ERC20(_token).safeTransfer(feeRecipient, fee);
         return true;
     }
@@ -109,10 +141,16 @@ contract UnstoppableVault is IERC3156FlashLender, ReentrancyGuard, Owned, ERC462
     /**
      * @inheritdoc ERC4626
      */
-    function beforeWithdraw(uint256 assets, uint256 shares) internal override nonReentrant {}
+    function beforeWithdraw(
+        uint256 assets,
+        uint256 shares
+    ) internal override nonReentrant {}
 
     /**
      * @inheritdoc ERC4626
      */
-    function afterDeposit(uint256 assets, uint256 shares) internal override nonReentrant {}
+    function afterDeposit(
+        uint256 assets,
+        uint256 shares
+    ) internal override nonReentrant {}
 }
