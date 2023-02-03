@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "solady/src/utils/SafeTransferLib.sol";
+import "hardhat/console.sol";
 
 interface IFlashLoanEtherReceiver {
     function execute() external payable;
@@ -29,7 +30,7 @@ contract SideEntranceLenderPool {
 
     function withdraw() external {
         uint256 amount = balances[msg.sender];
-        
+
         delete balances[msg.sender];
         emit Withdraw(msg.sender, amount);
 
@@ -41,7 +42,6 @@ contract SideEntranceLenderPool {
 
         IFlashLoanEtherReceiver(msg.sender).execute{value: amount}();
 
-        if (address(this).balance < balanceBefore)
-            revert RepayFailed();
+        if (address(this).balance < balanceBefore) revert RepayFailed();
     }
 }
