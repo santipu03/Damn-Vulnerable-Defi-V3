@@ -9,6 +9,7 @@ import "solady/src/auth/OwnableRoles.sol";
  * @title RewardToken
  * @author Damn Vulnerable DeFi (https://damnvulnerabledefi.xyz)
  */
+
 contract RewardToken is ERC20, OwnableRoles {
     uint256 public constant MINTER_ROLE = _ROLE_0;
 

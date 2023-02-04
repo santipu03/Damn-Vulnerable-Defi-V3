@@ -27,7 +27,10 @@ contract AccountingToken is ERC20Snapshot, OwnableRoles {
         _mint(to, amount);
     }
 
-    function burn(address from, uint256 amount) external onlyRoles(BURNER_ROLE) {
+    function burn(
+        address from,
+        uint256 amount
+    ) external onlyRoles(BURNER_ROLE) {
         _burn(from, amount);
     }
 
