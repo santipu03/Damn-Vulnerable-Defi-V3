@@ -66,6 +66,9 @@ describe("[Challenge] Climber", function () {
     /** CODE YOUR SOLUTION HERE */
     /**
      * KEY ATTACK VECTOR: become the sweeper and steal all funds
+     * 
+     * STEPS:
+     *    - 
      */
     console.log(vault.address);
     console.log(await vault.getSweeper());
